@@ -29,7 +29,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs};
 
 // Unique file names
-pub fn generate_unique_file_name(dir: &Path, ext: &str) -> PathBuf {
+fn generate_unique_file_name(dir: &Path, ext: &str) -> PathBuf {
     let mut time_val = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -46,12 +46,12 @@ pub fn generate_unique_file_name(dir: &Path, ext: &str) -> PathBuf {
 }
 
 // Temporary directories
-pub struct TempDir {
+struct TempDir {
     path: PathBuf,
 }
 
 impl TempDir {
-    pub fn new(prefix: &str) -> Self {
+    fn new(prefix: &str) -> Self {
         let mut time_val = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -68,7 +68,7 @@ impl TempDir {
         Self { path }
     }
 
-    pub fn path(&self) -> &Path {
+    fn path(&self) -> &Path {
         self.path.as_path()
     }
 }
@@ -80,16 +80,16 @@ impl Drop for TempDir {
 }
 
 // CRC-32 checksum
-pub struct Crc32Digest {
+struct Crc32Digest {
     sum: u32,
 }
 
 impl Crc32Digest {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self { sum: 0xFFFFFFFF }
     }
 
-    pub fn update(&mut self, data: &[u8]) {
+    fn update(&mut self, data: &[u8]) {
         const TABLE: [u32; 256] = [
             0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535,
             0x9E6495A3, 0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD,
@@ -135,7 +135,7 @@ impl Crc32Digest {
         }
     }
 
-    pub fn sum(&self) -> u32 {
+    fn sum(&self) -> u32 {
         !self.sum
     }
 }
@@ -147,7 +147,7 @@ impl Default for Crc32Digest {
 }
 
 // UNIX time to MS-DOS date and time
-pub fn unix_to_msdos_time(secs: u64) -> u32 {
+fn unix_to_msdos_time(secs: u64) -> u32 {
     const SECS_PER_MINUTE: u64 = 60;
     const SECS_PER_HOUR: u64 = SECS_PER_MINUTE * 60;
     const SECS_PER_DAY: u64 = SECS_PER_HOUR * 24;
@@ -264,7 +264,8 @@ pub fn unix_to_msdos_time(secs: u64) -> u32 {
     ((year << 25) | (month << 21) | (day << 16) | (hour << 11) | (minute << 5) | second) as u32
 }
 
-pub struct SimpleZipArchive {
+// Basic ZIP archives
+struct SimpleZipArchive {
     writer: Box<dyn Write>,
     directory: Vec<u8>,
     position: u32,
@@ -273,7 +274,7 @@ pub struct SimpleZipArchive {
 }
 
 impl SimpleZipArchive {
-    pub fn new(writer: impl Write + 'static) -> Self {
+    fn new(writer: impl Write + 'static) -> Self {
         Self {
             writer: Box::new(writer),
             directory: Vec::new(),
@@ -289,11 +290,11 @@ impl SimpleZipArchive {
         }
     }
 
-    pub fn create<P: AsRef<Path>>(path: P) -> Result<Self> {
+    fn create<P: AsRef<Path>>(path: P) -> Result<Self> {
         Ok(Self::new(File::create(path)?))
     }
 
-    pub fn write_file<P: AsRef<Path>>(&mut self, in_path: P, file_name: String) -> Result<()> {
+    fn write_file<P: AsRef<Path>>(&mut self, in_path: P, file_name: String) -> Result<()> {
         let metadata = in_path.as_ref().metadata()?;
         let mut in_file = File::open(in_path)?;
 
