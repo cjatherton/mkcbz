@@ -1,5 +1,5 @@
 //
-// Copyright 2024 Christopher Atherton <the8lack8ox@pm.me>
+// Copyright 2024-2025 Christopher Atherton <the8lack8ox@pm.me>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the “Software”), to
@@ -22,28 +22,11 @@
 
 use std::collections::VecDeque;
 use std::fs::File;
-use std::io::{Read, Result, Seek, Write};
+use std::io::{Error, ErrorKind, Read, Result, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs};
-
-// Unique file names
-fn generate_unique_file_name(dir: &Path, ext: &str) -> PathBuf {
-    let mut time_val = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .subsec_nanos();
-    let mut path = dir.join(format!("{:08x}{ext}", time_val));
-    while path.exists() {
-        time_val = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .subsec_nanos();
-        path = dir.join(format!("{:08x}{ext}", time_val));
-    }
-    path
-}
 
 // Temporary directories
 struct TempDir {
@@ -80,11 +63,11 @@ impl Drop for TempDir {
 }
 
 // CRC-32 checksum
-struct Crc32Digest {
+struct Crc32 {
     sum: u32,
 }
 
-impl Crc32Digest {
+impl Crc32 {
     fn new() -> Self {
         Self { sum: 0xFFFFFFFF }
     }
@@ -140,137 +123,12 @@ impl Crc32Digest {
     }
 }
 
-impl Default for Crc32Digest {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// UNIX time to MS-DOS date and time
-fn unix_to_msdos_time(secs: u64) -> u32 {
-    const SECS_PER_MINUTE: u64 = 60;
-    const SECS_PER_HOUR: u64 = SECS_PER_MINUTE * 60;
-    const SECS_PER_DAY: u64 = SECS_PER_HOUR * 24;
-    const SECS_IN_MONTH: [u64; 12] = [
-        SECS_PER_DAY * 31, // January
-        SECS_PER_DAY * 28, // February
-        SECS_PER_DAY * 31, // March
-        SECS_PER_DAY * 30, // April
-        SECS_PER_DAY * 31, // May
-        SECS_PER_DAY * 30, // June
-        SECS_PER_DAY * 31, // July
-        SECS_PER_DAY * 31, // August
-        SECS_PER_DAY * 30, // September
-        SECS_PER_DAY * 31, // October
-        SECS_PER_DAY * 30, // November
-        SECS_PER_DAY * 31, // December
-    ];
-    const SECS_IN_MONTH_LEAP: [u64; 12] = [
-        SECS_PER_DAY * 31, // January
-        SECS_PER_DAY * 29, // February
-        SECS_PER_DAY * 31, // March
-        SECS_PER_DAY * 30, // April
-        SECS_PER_DAY * 31, // May
-        SECS_PER_DAY * 30, // June
-        SECS_PER_DAY * 31, // July
-        SECS_PER_DAY * 31, // August
-        SECS_PER_DAY * 30, // September
-        SECS_PER_DAY * 31, // October
-        SECS_PER_DAY * 30, // November
-        SECS_PER_DAY * 31, // December
-    ];
-    const SECS_PER_YEAR: u64 = SECS_IN_MONTH[0] // January
-        + SECS_IN_MONTH[1] // February
-        + SECS_IN_MONTH[2] // March
-        + SECS_IN_MONTH[3] // April
-        + SECS_IN_MONTH[4] // May
-        + SECS_IN_MONTH[5] // June
-        + SECS_IN_MONTH[6] // July
-        + SECS_IN_MONTH[7] // August
-        + SECS_IN_MONTH[8] // September
-        + SECS_IN_MONTH[9] // October
-        + SECS_IN_MONTH[10] // November
-        + SECS_IN_MONTH[11]; // December
-    const SECS_PER_YEAR_LEAP: u64 = SECS_IN_MONTH_LEAP[0] // January
-        + SECS_IN_MONTH_LEAP[1] // February
-        + SECS_IN_MONTH_LEAP[2] // March
-        + SECS_IN_MONTH_LEAP[3] // April
-        + SECS_IN_MONTH_LEAP[4] // May
-        + SECS_IN_MONTH_LEAP[5] // June
-        + SECS_IN_MONTH_LEAP[6] // July
-        + SECS_IN_MONTH_LEAP[7] // August
-        + SECS_IN_MONTH_LEAP[8] // September
-        + SECS_IN_MONTH_LEAP[9] // October
-        + SECS_IN_MONTH_LEAP[10] // November
-        + SECS_IN_MONTH_LEAP[11]; // December
-    const TIME_OF_1980: u64 = 8 * SECS_PER_YEAR + 2 * SECS_PER_YEAR_LEAP;
-
-    let mut rem = secs - TIME_OF_1980;
-
-    // Year
-    let mut year = 0;
-    for i in 0.. {
-        if i % 4 != 0 {
-            if rem < SECS_PER_YEAR {
-                break;
-            }
-            rem -= SECS_PER_YEAR;
-            year += 1;
-        } else {
-            if rem < SECS_PER_YEAR_LEAP {
-                break;
-            }
-            rem -= SECS_PER_YEAR_LEAP;
-            year += 1;
-        }
-    }
-
-    // Month
-    let mut month = 1;
-    if year % 4 != 0 {
-        for i in SECS_IN_MONTH {
-            if rem < i {
-                break;
-            }
-            rem -= i;
-            month += 1;
-        }
-    } else {
-        for i in SECS_IN_MONTH_LEAP {
-            if rem < i {
-                break;
-            }
-            rem -= i;
-            month += 1;
-        }
-    }
-
-    // Day
-    let day = rem / SECS_PER_DAY + 1;
-    rem -= (day - 1) * SECS_PER_DAY;
-
-    // Hour
-    let hour = rem / SECS_PER_HOUR;
-    rem -= hour * SECS_PER_HOUR;
-
-    // Minute
-    let minute = rem / SECS_PER_MINUTE;
-    rem -= minute * SECS_PER_MINUTE;
-
-    // Second
-    let second = rem / 2;
-
-    // Pack
-    ((year << 25) | (month << 21) | (day << 16) | (hour << 11) | (minute << 5) | second) as u32
-}
-
 // Basic ZIP archives
 struct SimpleZipArchive {
     writer: Box<dyn Write>,
     directory: Vec<u8>,
     position: u32,
     entry_count: u16,
-    mtime: [u8; 4],
 }
 
 impl SimpleZipArchive {
@@ -280,13 +138,6 @@ impl SimpleZipArchive {
             directory: Vec::new(),
             position: 0,
             entry_count: 0,
-            mtime: unix_to_msdos_time(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-            )
-            .to_le_bytes(),
         }
     }
 
@@ -294,64 +145,66 @@ impl SimpleZipArchive {
         Ok(Self::new(File::create(path)?))
     }
 
-    fn write_file<P: AsRef<Path>>(&mut self, in_path: P, file_name: String) -> Result<()> {
-        let metadata = in_path.as_ref().metadata()?;
-        let mut in_file = File::open(in_path)?;
+    fn write_file<P: AsRef<Path>>(&mut self, path: P, file_name: &str) -> Result<()> {
+        let metadata = path.as_ref().metadata()?;
+        let mut file = File::open(path)?;
 
         // Checksum
-        let mut crc = Crc32Digest::new();
+        let mut crc = Crc32::new();
         let mut buffer = [0; 8192];
-        let mut count = in_file.read(&mut buffer)?;
+        let mut count = file.read(&mut buffer)?;
         while count > 0 {
             crc.update(&buffer[..count]);
-            count = in_file.read(&mut buffer)?;
+            count = file.read(&mut buffer)?;
         }
         let crc_bytes = crc.sum().to_le_bytes();
 
         // File size
-        let file_len = metadata.len() as u32;
+        let file_len =
+            TryInto::<u32>::try_into(metadata.len()).expect("Problem writing file size in ZIP");
         let file_len_bytes = file_len.to_le_bytes();
 
         // File name length
-        let file_name_bytes = file_name.into_bytes();
-        let file_name_len = file_name_bytes.len() as u16;
+        let file_name_bytes = file_name.as_bytes();
+        let file_name_len = TryInto::<u16>::try_into(file_name_bytes.len())
+            .expect("Problem writing file name length in ZIP");
         let file_name_len_bytes = file_name_len.to_le_bytes();
 
         // Local file header
         self.writer.write_all(&[0x50, 0x4B, 0x03, 0x04])?; // Signature
         self.writer.write_all(&[0x14, 0x00])?; // Version
-        self.writer.write_all(&[0x00, 0x00])?; // Flags
-        self.writer.write_all(&[0x00, 0x00])?; // Compression method
-        self.writer.write_all(&self.mtime)?; // Modification time
+        self.writer.write_all(&[0; 2])?; // Flags
+        self.writer.write_all(&[0; 2])?; // Compression method
+        self.writer.write_all(&[0; 4])?; // Modification time
         self.writer.write_all(&crc_bytes)?; // CRC-32 checksum
         self.writer.write_all(&file_len_bytes)?; // Compressed size
         self.writer.write_all(&file_len_bytes)?; // Uncompressed size
         self.writer.write_all(&file_name_len_bytes)?; // File name length
-        self.writer.write_all(&[0x00, 0x00])?; // Extra field length
-        self.writer.write_all(&file_name_bytes)?; // File name
+        self.writer.write_all(&[0; 2])?; // Extra field length
+        self.writer.write_all(file_name_bytes)?; // File name
 
         // Copy file
-        in_file.rewind()?;
-        std::io::copy(&mut in_file, &mut self.writer)?;
+        file.rewind()?;
+        std::io::copy(&mut file, &mut self.writer)?;
 
         // Central directory entry
         self.directory.write_all(&[0x50, 0x4B, 0x01, 0x02])?; // Signature
         self.directory.write_all(&[0x14, 0x00])?; // Version made by
         self.directory.write_all(&[0x14, 0x00])?; // Minimum version needed
-        self.directory.write_all(&[0x00, 0x00])?; // Flags
-        self.directory.write_all(&[0x00, 0x00])?; // Compression method
-        self.directory.write_all(&self.mtime)?; // Modification time
+        self.directory.write_all(&[0; 2])?; // Flags
+        self.directory.write_all(&[0; 2])?; // Compression method
+        self.directory.write_all(&[0; 4])?; // Modification time
         self.directory.write_all(&crc_bytes)?; // CRC-32 checksum
         self.directory.write_all(&file_len_bytes)?; // Compressed size
         self.directory.write_all(&file_len_bytes)?; // Uncompressed size
         self.directory.write_all(&file_name_len_bytes)?; // File name length
-        self.directory.write_all(&[0x00, 0x00])?; // Extra field length
-        self.directory.write_all(&[0x00, 0x00])?; // Comment length
-        self.directory.write_all(&[0x00, 0x00])?; // Disk number start
-        self.directory.write_all(&[0x00, 0x00])?; // Internal attributes
-        self.directory.write_all(&[0x00, 0x00, 0x00, 0x00])?; // External attributes
+        self.directory.write_all(&[0; 2])?; // Extra field length
+        self.directory.write_all(&[0; 2])?; // Comment length
+        self.directory.write_all(&[0; 2])?; // Disk number start
+        self.directory.write_all(&[0; 2])?; // Internal attributes
+        self.directory.write_all(&[0; 4])?; // External attributes
         self.directory.write_all(&self.position.to_le_bytes())?; // Offset of local header
-        self.directory.write_all(&file_name_bytes)?; // File name
+        self.directory.write_all(file_name_bytes)?; // File name
 
         // Update position
         self.position += 30 + file_name_len as u32 + file_len;
@@ -377,11 +230,11 @@ impl Drop for SimpleZipArchive {
             .expect("Could not write ZIP end of central directory signature");
         // Disk number
         self.writer
-            .write_all(&[0x00, 0x00])
+            .write_all(&[0; 2])
             .expect("Could not write ZIP disk number");
         // Starting disk number
         self.writer
-            .write_all(&[0x00, 0x00])
+            .write_all(&[0; 2])
             .expect("Could not write ZIP starting disk number");
         // Total entries on this disk
         self.writer
@@ -393,7 +246,11 @@ impl Drop for SimpleZipArchive {
             .expect("Could not write ZIP overall entry count");
         // Central directory size
         self.writer
-            .write_all(&(self.directory.len() as u32).to_le_bytes())
+            .write_all(
+                &TryInto::<u32>::try_into(self.directory.len())
+                    .expect("Problem writing central directory size in ZIP")
+                    .to_le_bytes(),
+            )
             .expect("Could not write ZIP central directory size");
         // Central directory offset
         self.writer
@@ -401,7 +258,7 @@ impl Drop for SimpleZipArchive {
             .expect("Could not write ZIP central directory location");
         // Comment length
         self.writer
-            .write_all(&[0x00, 0x00])
+            .write_all(&[0; 2])
             .expect("Could not write ZIP end of central directory comment length");
 
         // Flush
@@ -411,185 +268,181 @@ impl Drop for SimpleZipArchive {
     }
 }
 
-const PROGRAM_NAME: &str = "mkcbz";
-const USAGE_MESSAGE: &str = "Usage: mkcbz [--avif] OUTPUT INPUT [INPUT]...";
-type ArchiveType = SimpleZipArchive;
+enum CbzWriterJob {
+    Copy(PathBuf, usize),
+    Convert(Child, PathBuf, usize),
+}
 
-fn convert_avif(in_path: &Path, out_path: &Path) -> Child {
-    match Command::new("avifenc")
-        .arg(in_path)
-        .arg(out_path)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-    {
-        Ok(proc) => proc,
-        Err(_) => {
-            eprintln!("ERROR! Failed to run avifenc on `{}`", in_path.display());
-            std::process::exit(1);
-        }
+struct CbzWriter {
+    zip: SimpleZipArchive,
+    jobs: VecDeque<CbzWriterJob>,
+    index: usize,
+    padding: usize,
+    processes: usize,
+    work_dir: TempDir,
+}
+
+impl CbzWriter {
+    fn new(writer: impl Write + 'static, padding: usize) -> Result<Self> {
+        let processes = std::thread::available_parallelism()?.get();
+        Ok(Self {
+            zip: SimpleZipArchive::new(writer),
+            jobs: VecDeque::with_capacity(processes),
+            index: 1,
+            padding,
+            processes,
+            work_dir: TempDir::new("mkcbz"),
+        })
     }
-}
 
-#[derive(Clone, PartialEq)]
-enum Conversion {
-    Copy,
-    Avif,
-}
+    fn create<P: AsRef<Path>>(path: P, padding: usize) -> Result<Self> {
+        let processes = std::thread::available_parallelism()?.get();
+        Ok(Self {
+            zip: SimpleZipArchive::create(path)?,
+            jobs: VecDeque::with_capacity(processes),
+            index: 1,
+            padding,
+            processes,
+            work_dir: TempDir::new("mkcbz"),
+        })
+    }
 
-struct Task {
-    path: PathBuf,
-    conversion: Conversion,
-    convert_proc: Option<Child>,
-}
-
-impl Task {
-    fn new(in_path: &Path, conversion: Conversion, work_dir: &Path) -> Self {
-        match conversion {
-            Conversion::Copy => Self {
-                path: in_path.to_path_buf(),
-                conversion,
-                convert_proc: None,
-            },
-            Conversion::Avif => {
-                let out_path = generate_unique_file_name(work_dir, ".avif");
-                let proc = convert_avif(in_path, &out_path);
-                Self {
-                    path: out_path,
-                    conversion,
-                    convert_proc: Some(proc),
+    fn submit(&mut self, path: &Path) -> Result<()> {
+        while self.jobs.len() >= self.processes {
+            let job = self.jobs.pop_front().unwrap();
+            match job {
+                CbzWriterJob::Copy(path, index) => self
+                    .zip
+                    .write_file(path, &format!("{:0fill$}.avif", index, fill = self.padding))?,
+                CbzWriterJob::Convert(mut proc, path, index) => {
+                    if !proc.wait()?.success() {
+                        return Err(Error::new(ErrorKind::Other, "avifenc returned failure"));
+                    }
+                    self.zip.write_file(
+                        &path,
+                        &format!("{:0fill$}.avif", index, fill = self.padding),
+                    )?;
+                    fs::remove_file(path)?;
                 }
             }
         }
-    }
-
-    fn finish(&mut self, index: usize, width: usize, archive: &mut ArchiveType) -> Result<()> {
-        if let Some(ref mut child) = self.convert_proc {
-            if !child.wait()?.success() {
-                eprintln!("ERROR! Image encoding process returned failure");
-                std::process::exit(1);
+        match path.extension() {
+            Some(ext) => {
+                if !ext.eq_ignore_ascii_case("avif") {
+                    let tmp_path = self.work_dir.path().join(format!(
+                        "{:0fill$}.avif",
+                        self.index,
+                        fill = self.padding
+                    ));
+                    self.jobs.push_back(CbzWriterJob::Convert(
+                        Command::new("avifenc")
+                            .args(["--jobs", "1"])
+                            .args(["--speed", "0"])
+                            .arg(path)
+                            .arg(&tmp_path)
+                            .stdout(Stdio::null())
+                            .stderr(Stdio::null())
+                            .spawn()?,
+                        tmp_path,
+                        self.index,
+                    ))
+                } else {
+                    self.jobs
+                        .push_back(CbzWriterJob::Copy(path.to_path_buf(), self.index));
+                }
+            }
+            None => {
+                let tmp_path = self.work_dir.path().join(format!(
+                    "{:0fill$}.avif",
+                    self.index,
+                    fill = self.padding
+                ));
+                self.jobs.push_back(CbzWriterJob::Convert(
+                    Command::new("avifenc")
+                        .args(["--jobs", "1"])
+                        .args(["--speed", "0"])
+                        .arg(path)
+                        .arg(&tmp_path)
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .spawn()?,
+                    tmp_path,
+                    self.index,
+                ))
             }
         }
-        let ext = match self.conversion {
-            Conversion::Copy => match self.path.extension() {
-                Some(ext) => {
-                    String::from(".") + ext.to_string_lossy().to_ascii_lowercase().as_str()
+        self.index += 1;
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<()> {
+        while let Some(job) = self.jobs.pop_front() {
+            match job {
+                CbzWriterJob::Copy(path, index) => self
+                    .zip
+                    .write_file(path, &format!("{:0fill$}.avif", index, fill = self.padding))?,
+                CbzWriterJob::Convert(mut proc, path, index) => {
+                    if !proc.wait()?.success() {
+                        return Err(Error::new(ErrorKind::Other, "avifenc returned failure"));
+                    }
+                    self.zip.write_file(
+                        &path,
+                        &format!("{:0fill$}.avif", index, fill = self.padding),
+                    )?;
+                    fs::remove_file(path)?;
                 }
-                None => String::new(),
-            },
-            Conversion::Avif => String::from(".avif"),
-        };
-        archive.write_file(&self.path, format!("{:0fill$}{ext}", index, fill = width))?;
-        if self.conversion != Conversion::Copy {
-            fs::remove_file(&self.path).expect("Could not remove temporary image file");
+            }
         }
         Ok(())
     }
 }
 
 fn run() -> Result<()> {
-    // Check command line
-    if env::args().len() < 3 {
-        eprintln!("{USAGE_MESSAGE}");
-        std::process::exit(1);
-    }
-    let conversion = match env::args().nth(1).unwrap().as_str() {
-        "--avif" => Conversion::Avif,
-        _ => Conversion::Copy,
-    };
-    let output_path;
-    let cli_inputs: Vec<_>;
-    if conversion == Conversion::Copy {
-        output_path = env::args().nth(1).unwrap();
-        cli_inputs = env::args().skip(2).map(PathBuf::from).collect();
-    } else {
-        if env::args().len() < 4 {
-            eprintln!("{USAGE_MESSAGE}");
-            std::process::exit(1);
-        }
-        output_path = env::args().nth(2).unwrap();
-        cli_inputs = env::args().skip(3).map(PathBuf::from).collect();
+    let args: Vec<_> = env::args().collect();
+    if args.len() < 3 {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Wrong number of arguments (less than 2)",
+        ));
     }
 
-    // Collect inputs
-    let mut inputs;
-    if cli_inputs.len() == 1 && cli_inputs[0].is_dir() {
-        inputs = Vec::new();
-        for entry in fs::read_dir(&cli_inputs[0])? {
-            let path = entry?.path();
-            if !path.is_file() {
-                eprintln!("ERROR! `{}` is not a file", path.display());
-                std::process::exit(1);
-            }
-            inputs.push(path);
-        }
-        if inputs.is_empty() {
-            eprintln!("ERROR! `{}` is empty", cli_inputs[0].display());
-            std::process::exit(1);
-        }
+    let inputs: Vec<_> = if args.len() == 3 {
+        let mut files: Vec<_> = fs::read_dir(&args[2])?
+            .filter_map(|entry| entry.ok().map(|e| e.path()))
+            .filter(|path| path.is_file())
+            .collect();
+        files.sort();
+        files
     } else {
-        inputs = cli_inputs;
-        for path in &inputs {
-            if !path.exists() {
-                eprintln!("ERROR! File `{}` does not exist", path.display());
-                std::process::exit(1);
+        let mut files: Vec<_> = args[2..].iter().map(PathBuf::from).collect();
+        for file in &files {
+            if !file.exists() {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    format!("'{}' does not exist", file.display()),
+                ));
             }
-            if !path.is_file() {
-                eprintln!("ERROR! `{}` is not a file", path.display());
-                std::process::exit(1);
+            if !file.is_file() {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("'{}' is not a file", file.display()),
+                ));
             }
         }
-    }
-    inputs.sort();
-    let width = inputs.len().to_string().len();
-    let mut inputs_queue = VecDeque::from(inputs);
-
-    // Create output file
-    let mut archive = if output_path == "-" {
-        ArchiveType::new(std::io::stdout())
-    } else {
-        ArchiveType::create(PathBuf::from(output_path))?
+        files.sort();
+        files
     };
 
-    // Create work directory
-    let work_path;
-    let _work_dir;
-    match conversion {
-        Conversion::Copy => {
-            work_path = PathBuf::new();
-            _work_dir = None;
-        }
-        _ => {
-            let tmp_dir = TempDir::new(PROGRAM_NAME);
-            work_path = tmp_dir.path().to_path_buf();
-            _work_dir = Some(tmp_dir);
-        }
-    }
+    let mut cbz = if args[1] == "-" {
+        CbzWriter::new(std::io::stdout(), inputs.len().to_string().len())?
+    } else {
+        CbzWriter::create(&args[1], inputs.len().to_string().len())?
+    };
 
-    // Process
-    let process_count = std::thread::available_parallelism()?.get();
-    let mut task_queue = VecDeque::with_capacity(process_count);
-    for _ in 0..(std::cmp::min(inputs_queue.len(), process_count) - 1) {
-        let input = inputs_queue.pop_front().unwrap();
-        task_queue.push_back(Task::new(&input, conversion.clone(), &work_path));
+    for file in inputs {
+        cbz.submit(file.as_path())?;
     }
-    let mut index = 0;
-    while let Some(input) = inputs_queue.pop_front() {
-        // Submit new job
-        task_queue.push_back(Task::new(&input, conversion.clone(), &work_path));
-
-        // Finish front job
-        index += 1;
-        task_queue
-            .pop_front()
-            .unwrap()
-            .finish(index, width, &mut archive)?;
-    }
-    // Finish rest of jobs
-    while let Some(mut task) = task_queue.pop_front() {
-        index += 1;
-        task.finish(index, width, &mut archive)?;
-    }
+    cbz.finish()?;
 
     Ok(())
 }
@@ -598,7 +451,7 @@ fn main() {
     match run() {
         Ok(()) => (),
         Err(err) => {
-            eprintln!("{err}");
+            eprintln!("ERROR: {err}");
             std::process::exit(1);
         }
     }

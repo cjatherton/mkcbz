@@ -1,7 +1,7 @@
 [package]
 name = "mkcbz"
-description = "Merge images into comic book archive (ZIP format)"
 version = "0.1.0"
+description = "Pack images into comic book archive (ZIP format)"
 edition = "2024"
 license = "MIT"
 authors = ["Christopher Atherton <the8lack8ox@pm.me>"]
