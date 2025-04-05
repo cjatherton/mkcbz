@@ -1,9 +1,9 @@
 [package]
 name = "mkcbz"
 version = "0.1.0"
-description = "Pack images into comic book archive (ZIP format)"
 edition = "2024"
 license = "MIT"
+description = "Pack images into comic book archive (ZIP format)"
 authors = ["Christopher Atherton <the8lack8ox@pm.me>"]
 
 [dependencies]
