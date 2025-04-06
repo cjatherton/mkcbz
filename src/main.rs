@@ -146,8 +146,7 @@ impl SimpleZipArchive {
     }
 
     fn write_file<P: AsRef<Path>>(&mut self, path: P, file_name: &str) -> Result<()> {
-        let metadata = path.as_ref().metadata()?;
-        let mut file = File::open(path)?;
+        let mut file = File::open(&path)?;
 
         // Checksum
         let mut crc = Crc32::new();
@@ -161,13 +160,13 @@ impl SimpleZipArchive {
 
         // File size
         let file_len =
-            TryInto::<u32>::try_into(metadata.len()).expect("Problem writing file size in ZIP");
+            u32::try_from(path.as_ref().metadata()?.len()).expect("File too big for ZIP");
         let file_len_bytes = file_len.to_le_bytes();
 
         // File name length
         let file_name_bytes = file_name.as_bytes();
-        let file_name_len = TryInto::<u16>::try_into(file_name_bytes.len())
-            .expect("Problem writing file name length in ZIP");
+        let file_name_len =
+            u16::try_from(file_name_bytes.len()).expect("File name too long for ZIP");
         let file_name_len_bytes = file_name_len.to_le_bytes();
 
         // Local file header
@@ -247,8 +246,8 @@ impl Drop for SimpleZipArchive {
         // Central directory size
         self.writer
             .write_all(
-                &TryInto::<u32>::try_into(self.directory.len())
-                    .expect("Problem writing central directory size in ZIP")
+                &u32::try_from(self.directory.len())
+                    .expect("File count exceeds central directory size limit")
                     .to_le_bytes(),
             )
             .expect("Could not write ZIP central directory size");
