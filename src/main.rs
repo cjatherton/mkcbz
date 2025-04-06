@@ -72,7 +72,7 @@ impl Crc32 {
         Self { sum: 0xFFFFFFFF }
     }
 
-    fn update(&mut self, data: &[u8]) {
+    fn update(&mut self, buf: &[u8]) {
         const TABLE: [u32; 256] = [
             0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535,
             0x9E6495A3, 0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD,
@@ -113,8 +113,8 @@ impl Crc32 {
             0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D,
         ];
 
-        for b in data {
-            self.sum = (self.sum >> 8) ^ TABLE[(((*b as u32) ^ self.sum) & 0xFF) as usize];
+        for &b in buf {
+            self.sum = (self.sum >> 8) ^ TABLE[(((b as u32) ^ self.sum) & 0xFF) as usize];
         }
     }
 
@@ -398,45 +398,37 @@ impl CbzWriter {
 }
 
 fn run() -> Result<()> {
-    let args: Vec<_> = env::args().collect();
-    if args.len() < 3 {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Wrong number of arguments (less than 2)",
-        ));
+    if env::args().len() < 3 {
+        eprintln!("USAGE: mkcbz OUTPUT.cbz INPUTS...");
+        std::process::exit(1);
     }
 
-    let inputs: Vec<_> = if args.len() == 3 {
-        let mut files: Vec<_> = fs::read_dir(&args[2])?
-            .filter_map(|entry| entry.ok().map(|e| e.path()))
-            .filter(|path| path.is_file())
-            .collect();
-        files.sort();
-        files
-    } else {
-        let mut files: Vec<_> = args[2..].iter().map(PathBuf::from).collect();
-        for file in &files {
-            if !file.exists() {
-                return Err(Error::new(
-                    ErrorKind::NotFound,
-                    format!("'{}' does not exist", file.display()),
-                ));
-            }
-            if !file.is_file() {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
-                    format!("'{}' is not a file", file.display()),
-                ));
-            }
+    let cl_inputs: Vec<_> = env::args().skip(2).map(PathBuf::from).collect();
+    let mut inputs = Vec::new();
+    for cl_input in cl_inputs {
+        if !cl_input.exists() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("'{}' does not exist", cl_input.display()),
+            ));
         }
-        files.sort();
-        files
-    };
+        if cl_input.is_dir() {
+            let mut files: Vec<_> = fs::read_dir(cl_input)?
+                .filter_map(|entry| entry.ok().map(|e| e.path()))
+                .filter(|path| path.is_file())
+                .collect();
+            files.sort();
+            inputs.append(&mut files);
+        } else {
+            inputs.push(cl_input);
+        }
+    }
 
-    let mut cbz = if args[1] == "-" {
+    let output = env::args().nth(1).unwrap();
+    let mut cbz = if output == "-" {
         CbzWriter::new(std::io::stdout(), inputs.len().to_string().len())?
     } else {
-        CbzWriter::create(&args[1], inputs.len().to_string().len())?
+        CbzWriter::create(output, inputs.len().to_string().len())?
     };
 
     for file in inputs {
