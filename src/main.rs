@@ -425,9 +425,9 @@ fn run() -> Result<()> {
 
     let output = env::args().nth(1).unwrap();
     let mut cbz = if output == "-" {
-        CbzWriter::new(std::io::stdout(), inputs.len().to_string().len())?
+        CbzWriter::new(std::io::stdout(), inputs.len().ilog10() as usize + 1)?
     } else {
-        CbzWriter::create(output, inputs.len().to_string().len())?
+        CbzWriter::create(output, inputs.len().ilog10() as usize + 1)?
     };
 
     for file in inputs {
