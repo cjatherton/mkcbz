@@ -50,6 +50,9 @@ mkcbz will include inputs in the output in the order they appear on the command 
 
 ## FAQ
 
+### Why identify images as color or grayscale?
+If an image is stored as color but can be identified as a truly grayscale image, the color element can be removed. This can lead to, sometimes drastic, improvements in file size, as well as make the picture more visually pleasing.
+
 ### Why is mkcbz mistaking color pages as grayscale?
 A perceptual colorfulness metric created by Hasler and Süsstrunk is used to evaluate whether an image is color or not. You can tune this with the `--threshold` option, using the output as a guide. If you want to turn off this feature, set `--threshold` to anything negative, i.e. -1.0. A setting of 0.0 should miss every color image while catching many grayscales in some instances. The default is 14.0.
 
