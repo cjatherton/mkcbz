@@ -7,3 +7,6 @@ description = "Pack images into comic book archive (ZIP format)"
 authors = ["Christopher Atherton <the8lack8ox@pm.me>"]
 
 [dependencies]
+clap = { version = "4.5", features = ["derive"] }
+opencv = "0.94"
+zip = { version = "3", default-features = false }
