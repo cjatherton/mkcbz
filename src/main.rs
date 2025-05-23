@@ -155,11 +155,11 @@ fn validate_output_path(path: &Path) -> Result<()> {
 }
 
 // Get inputs out of directories provided on the command line
-fn collect_inputs(inputs: &Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+fn collect_inputs(inputs: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
     let mut ret = Vec::new();
     for input in inputs {
         if !input.exists() {
-            return Err(MkcbzError::NotFound(input.clone()).into());
+            return Err(MkcbzError::NotFound(input).into());
         }
         if input.is_dir() {
             let mut dir_contents = Vec::new();
@@ -171,13 +171,13 @@ fn collect_inputs(inputs: &Vec<PathBuf>) -> Result<Vec<PathBuf>> {
             dir_contents.sort();
             ret.append(&mut dir_contents);
         } else if input.is_file() {
-            if is_acceptable_image_format(input) {
-                ret.push(input.clone());
+            if is_acceptable_image_format(&input) {
+                ret.push(input);
             } else {
-                return Err(MkcbzError::UnsupportedFormat(input.clone()).into());
+                return Err(MkcbzError::UnsupportedFormat(input).into());
             }
         } else {
-            return Err(MkcbzError::NotAFileOrDirectory(input.clone()).into());
+            return Err(MkcbzError::NotAFileOrDirectory(input).into());
         }
     }
     Ok(ret)
@@ -412,11 +412,11 @@ fn run() -> Result<()> {
     // Generate input pages
     let mut old_size = 0;
     let mut input_pages = VecDeque::new();
-    for (index, path) in collect_inputs(&cli.input)?.iter().enumerate() {
-        old_size += get_file_size(path)?;
+    for (index, path) in collect_inputs(cli.input)?.into_iter().enumerate() {
+        old_size += get_file_size(&path)?;
         input_pages.push_back(InputPage {
             index,
-            path: path.clone(),
+            path,
             config: config.clone(),
         });
     }
