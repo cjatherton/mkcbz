@@ -260,7 +260,7 @@ fn calculate_colorfulness(mat: &Mat) -> Result<f64> {
 
     // yb
     let mut rg_weighted = Mat::default();
-    core::add_weighted(&r, 0.5, &g, 0.5, 0.0, &mut rg_weighted, -1)?;
+    core::add_weighted_def(&r, 0.5, &g, 0.5, 0.0, &mut rg_weighted)?;
     let mut yb = Mat::default();
     core::absdiff(&rg_weighted, &b, &mut yb)?;
     let mut yb_mean_mat = Mat::default();
