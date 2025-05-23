@@ -326,15 +326,13 @@ fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
 
     // Denoising
     if in_page.config.denoise {
+        let mut tmp = Mat::default();
         if is_grayscale {
-            let mut tmp = Mat::default();
             photo::fast_nl_means_denoising(&img, &mut tmp, 7.0, 7, 21)?;
-            img = tmp;
         } else {
-            let mut tmp = Mat::default();
             photo::fast_nl_means_denoising_colored(&img, &mut tmp, 7.0, 7.0, 7, 21)?;
-            img = tmp;
         }
+        img = tmp;
     }
 
     // Compress image
