@@ -159,7 +159,7 @@ fn collect_inputs(inputs: &Vec<PathBuf>) -> Result<Vec<PathBuf>> {
     let mut ret = Vec::new();
     for input in inputs {
         if !input.exists() {
-            return Err(MkcbzError::NotFound(input.to_path_buf()).into());
+            return Err(MkcbzError::NotFound(input.clone()).into());
         }
         if input.is_dir() {
             let mut dir_contents = Vec::new();
@@ -174,10 +174,10 @@ fn collect_inputs(inputs: &Vec<PathBuf>) -> Result<Vec<PathBuf>> {
             if is_acceptable_image_format(input) {
                 ret.push(input.clone());
             } else {
-                return Err(MkcbzError::UnsupportedFormat(input.to_path_buf()).into());
+                return Err(MkcbzError::UnsupportedFormat(input.clone()).into());
             }
         } else {
-            return Err(MkcbzError::NotAFileOrDirectory(input.to_path_buf()).into());
+            return Err(MkcbzError::NotAFileOrDirectory(input.clone()).into());
         }
     }
     Ok(ret)
@@ -284,12 +284,12 @@ fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
     ) {
         img
     } else {
-        return Err(MkcbzError::FileOpenError(in_page.path.to_path_buf()).into());
+        return Err(MkcbzError::FileOpenError(in_page.path).into());
     };
 
     // Separate verification that this is a valid readable image
     if img.empty() {
-        return Err(MkcbzError::FileOpenError(in_page.path.to_path_buf()).into());
+        return Err(MkcbzError::FileOpenError(in_page.path).into());
     }
 
     // Colorspace conversion
