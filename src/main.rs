@@ -292,36 +292,49 @@ fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
         return Err(MkcbzError::FileOpenError(in_page.path.to_path_buf()).into());
     }
 
-    // Is this grayscale?
+    // Colorspace conversion
     let colorfulness;
     let is_grayscale;
-    if img.channels() == 1 {
-        // Image is already grayscale
-        colorfulness = 0.0;
-        is_grayscale = true;
-    } else {
-        // Check image colorfulness metric
-        colorfulness = calculate_colorfulness(&img)?;
-        is_grayscale = colorfulness <= in_page.config.color_thr;
-    };
-
-    // Colorspace conversion
-    if is_grayscale && img.channels() != 1 {
-        // Convert from color to grayscale
-        let mut tmp = Mat::default();
-        if img.channels() == 4 {
-            // Convert from BGRA to grayscale (it has alpha channel)
-            imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGRA2GRAY)?;
-        } else {
-            // Convert from BGR to grayscale
-            imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGR2GRAY)?;
+    match img.channels() {
+        1 => {
+            // Grayscale image
+            colorfulness = 0.0;
+            is_grayscale = true;
         }
-        img = tmp;
-    } else if !is_grayscale && img.channels() == 4 {
-        // Get rid of alpha channel
-        let mut tmp = Mat::default();
-        imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGRA2BGR)?;
-        img = tmp;
+        2 => {
+            // Grayscale image with alpha
+            colorfulness = 0.0;
+            is_grayscale = true;
+            let mut split_channels = core::Vector::new();
+            core::split(&img, &mut split_channels)?;
+            img = split_channels.get(0)?;
+        }
+        3 => {
+            // Color image
+            colorfulness = calculate_colorfulness(&img)?;
+            is_grayscale = colorfulness <= in_page.config.color_thr;
+            if is_grayscale {
+                let mut tmp = Mat::default();
+                imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGR2GRAY)?;
+                img = tmp;
+            }
+        }
+        4 => {
+            // Color image with alpha
+            colorfulness = calculate_colorfulness(&img)?;
+            is_grayscale = colorfulness <= in_page.config.color_thr;
+            let mut tmp = Mat::default();
+            if is_grayscale {
+                imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGRA2GRAY)?;
+            } else {
+                imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGRA2BGR)?;
+            }
+            img = tmp;
+        }
+        _ => {
+            // Unsupported image format
+            return Err(MkcbzError::UnsupportedFormat(in_page.path).into());
+        }
     }
 
     // Denoising
