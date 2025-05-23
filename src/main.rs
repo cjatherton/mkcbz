@@ -203,7 +203,7 @@ struct Cli {
 
     #[arg(short, long, default_value_t = ImageFormat::Webp, help = "Format for image conversion")]
     format: ImageFormat,
-    #[arg(short, long, default_value_t = 80, value_parser = clap::value_parser!(u32).range(..100), help = "Quality setting")]
+    #[arg(short, long, default_value_t = 80, value_parser = clap::value_parser!(u32).range(..=100), help = "Quality setting")]
     quality: u32,
     #[arg(
         short,
