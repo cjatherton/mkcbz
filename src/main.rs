@@ -163,9 +163,9 @@ fn collect_inputs(inputs: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
         }
         if input.is_dir() {
             let mut dir_contents = Vec::new();
-            for entry in input.read_dir()?.flatten() {
-                if entry.path().is_file() && is_acceptable_image_format(&entry.path()) {
-                    dir_contents.push(entry.path());
+            for path in input.read_dir()?.flatten().map(|e| e.path()) {
+                if path.is_file() && is_acceptable_image_format(&path) {
+                    dir_contents.push(path);
                 }
             }
             dir_contents.sort();
