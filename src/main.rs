@@ -242,7 +242,7 @@ struct ProcessedPage {
 
 // Perceptual colorfulness metric by Hasler and Süsstrunk
 fn calculate_colorfulness(mat: &Mat) -> Result<f64> {
-    // Split into r, g and r channels
+    // Split into r, g and b channels
     let mut channels = core::Vector::<Mat>::new();
     core::split(mat, &mut channels)?;
     let b = &channels.get(0)?;
@@ -259,10 +259,10 @@ fn calculate_colorfulness(mat: &Mat) -> Result<f64> {
     let rg_stddev = *rg_stddev_mat.at_2d::<f64>(0, 0)?;
 
     // yb
-    let mut rg_weighted = Mat::default();
-    core::add_weighted_def(&r, 0.5, &g, 0.5, 0.0, &mut rg_weighted)?;
+    let mut rg_avg = Mat::default();
+    core::add_weighted_def(&r, 0.5, &g, 0.5, 0.0, &mut rg_avg)?;
     let mut yb = Mat::default();
-    core::absdiff(&rg_weighted, &b, &mut yb)?;
+    core::absdiff(&rg_avg, &b, &mut yb)?;
     let mut yb_mean_mat = Mat::default();
     let mut yb_stddev_mat = Mat::default();
     core::mean_std_dev_def(&yb, &mut yb_mean_mat, &mut yb_stddev_mat)?;
