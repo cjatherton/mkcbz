@@ -3,7 +3,7 @@
 Pack images into a comic book archive in ZIP format (CBZ).
 
 ## Overview
-mkcbz is a simple tool for creating comic book archives while performing some additional processing. Specifically, mkcbz will convert images to grayscale even when not stored as such by using a colorfulness detection algorithm. It will also apply a denoising filter, which generally improves image quality and compressibility at the expense of some significant amount of time.
+mkcbz is a simple tool for creating comic book archives while performing some additional processing. Specifically, mkcbz will identify and convert images to grayscale even when not stored as such by using a colorfulness detection algorithm. It will also apply a denoising filter, which generally improves image quality and compressibility at the expense of some significant amount of time.
 
 ## Building
 
@@ -19,11 +19,11 @@ Just run `cargo build --release` and you'll be good to go.
 ## Installing
 
 ### OpenCV
-Install OpenCV. Be certain that `opencv-photo` is included part of the installation. You may have to install this as an addition.
+Install OpenCV.
 
 On Fedora, this is done by:
 ```sh
-sudo dnf install opencv opencv-photo
+sudo dnf install opencv
 ```
 
 ## Usage
@@ -51,7 +51,7 @@ mkcbz will include inputs in the output in the order they appear on the command 
 ## FAQ
 
 ### Why identify images as color or grayscale?
-If an image is stored as color but can be identified as a truly grayscale image, the color element can be removed. This can lead to, sometimes drastic, improvements in file size, as well as make the picture more visually pleasing.
+If an image is stored as color but can be identified as a truly grayscale image, the color element can be removed. This can lead to improvements in file size, as well as make the picture more visually pleasing.
 
 ### Why is mkcbz mistaking color pages as grayscale?
 A perceptual colorfulness metric created by Hasler and Süsstrunk is used to evaluate whether an image is color or not. You can tune this with the `--threshold` option, using the output as a guide. If you want to turn off this feature, set `--threshold` to anything negative, i.e. -1.0. A setting of 0.0 should miss every color image while catching many grayscales in some instances. The default is 14.0.
@@ -59,7 +59,7 @@ A perceptual colorfulness metric created by Hasler and Süsstrunk is used to eva
 The ability to force certain images as color or grayscale is a future goal.
 
 ### Why does mkcbz run so slow?
-The non-local means denoising filter slows everything down considerably. If speed is of the essence, you can turn this off with `--no-denoise`. Denoising generally improves image quality, and frequently, compressibility increases as well.
+The bilateral denoising filter slows everything down considerably. If speed is of the essence, you can turn this off with `--no-denoise`. Denoising generally improves image quality, and compressibility often greatly increases as well.
 
 ### Why is mkcbz using so much memory?
 Depending on image size and the number of threads you run concurrently, mkcbz can use a lot of memory on its processing. On several test sets, it peaked at ~3GB with 32 threads for me. Reduce the number of threads used with the `--threads` option if this is a problem.

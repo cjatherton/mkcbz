@@ -33,7 +33,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
 use opencv::prelude::*;
-use opencv::{core, imgcodecs, imgproc, photo};
+use opencv::{core, imgcodecs, imgproc};
 
 use clap::Parser;
 
@@ -213,7 +213,7 @@ struct Cli {
         help = "Colorfulness threshold for grayscale detection"
     )]
     threshold: f64,
-    #[arg(short = 'N', long, help = "Disable non-local means denoising filter")]
+    #[arg(short = 'N', long, help = "Disable bilateral denoising filter")]
     no_denoise: bool,
     #[arg(
         short = 'T',
@@ -292,23 +292,24 @@ fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
 
     // Color/grayscale detection
     let colorfulness = calculate_colorfulness(&img)?;
-    let is_grayscale = colorfulness <= in_page.config.color_thr;
 
-    // Denoising
-    if in_page.config.denoise {
+    // Colorspace conversion for grayscale
+    if colorfulness <= in_page.config.color_thr {
         let mut tmp = Mat::default();
-        if is_grayscale {
-            photo::fast_nl_means_denoising(&img, &mut tmp, 7.0, 7, 21)?;
-        } else {
-            photo::fast_nl_means_denoising_colored(&img, &mut tmp, 7.0, 7.0, 7, 21)?;
-        }
+        imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGR2GRAY)?;
         img = tmp;
     }
 
-    // Colorspace conversion for grayscale
-    if is_grayscale {
+    // Denoising
+    if in_page.config.denoise {
+        const ZERO_SIZE: core::Size = core::Size {
+            width: 0,
+            height: 0,
+        };
         let mut tmp = Mat::default();
-        imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGR2GRAY)?;
+        imgproc::resize(&img, &mut tmp, ZERO_SIZE, 2.0, 2.0, imgproc::INTER_LINEAR)?;
+        imgproc::bilateral_filter_def(&tmp, &mut img, 17, 7.0, 110.0)?;
+        imgproc::resize(&img, &mut tmp, ZERO_SIZE, 0.5, 0.5, imgproc::INTER_AREA)?;
         img = tmp;
     }
 
