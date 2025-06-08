@@ -278,64 +278,21 @@ fn calculate_colorfulness(mat: &Mat) -> Result<f64> {
 // Process an input page
 fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
     // Read image file
-    let mut img = if let Ok(img) = imgcodecs::imread(
-        in_page.path.as_os_str().to_str().unwrap(),
-        imgcodecs::IMREAD_UNCHANGED,
-    ) {
-        img
-    } else {
-        return Err(MkcbzError::FileOpenError(in_page.path).into());
-    };
-
-    // Separate verification that this is a valid readable image
+    let mut img = imgcodecs::imread_def(
+        in_page
+            .path
+            .as_os_str()
+            .to_str()
+            .expect("Path should be convertable to string"),
+    )?;
+    // If imread() fails, it returns an empty matrix
     if img.empty() {
         return Err(MkcbzError::FileOpenError(in_page.path).into());
     }
 
-    // Colorspace conversion
-    let colorfulness;
-    let is_grayscale;
-    match img.channels() {
-        1 => {
-            // Grayscale image
-            colorfulness = 0.0;
-            is_grayscale = true;
-        }
-        2 => {
-            // Grayscale image with alpha
-            colorfulness = 0.0;
-            is_grayscale = true;
-            let mut split_channels = core::Vector::new();
-            core::split(&img, &mut split_channels)?;
-            img = split_channels.get(0)?;
-        }
-        3 => {
-            // Color image
-            colorfulness = calculate_colorfulness(&img)?;
-            is_grayscale = colorfulness <= in_page.config.color_thr;
-            if is_grayscale {
-                let mut tmp = Mat::default();
-                imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGR2GRAY)?;
-                img = tmp;
-            }
-        }
-        4 => {
-            // Color image with alpha
-            colorfulness = calculate_colorfulness(&img)?;
-            is_grayscale = colorfulness <= in_page.config.color_thr;
-            let mut tmp = Mat::default();
-            if is_grayscale {
-                imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGRA2GRAY)?;
-            } else {
-                imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGRA2BGR)?;
-            }
-            img = tmp;
-        }
-        _ => {
-            // Unsupported image format
-            return Err(MkcbzError::UnsupportedFormat(in_page.path).into());
-        }
-    }
+    // Color/grayscale detection
+    let colorfulness = calculate_colorfulness(&img)?;
+    let is_grayscale = colorfulness <= in_page.config.color_thr;
 
     // Denoising
     if in_page.config.denoise {
@@ -345,6 +302,13 @@ fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
         } else {
             photo::fast_nl_means_denoising_colored(&img, &mut tmp, 7.0, 7.0, 7, 21)?;
         }
+        img = tmp;
+    }
+
+    // Colorspace conversion for grayscale
+    if is_grayscale {
+        let mut tmp = Mat::default();
+        imgproc::cvt_color_def(&img, &mut tmp, imgproc::COLOR_BGR2GRAY)?;
         img = tmp;
     }
 
@@ -366,16 +330,13 @@ fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
         }
     }
     let mut buf = core::Vector::new();
-    if let Ok(success) = imgcodecs::imencode(
-        format!(".{}", in_page.config.format.get_extension()).as_str(),
+    let success = imgcodecs::imencode(
+        (String::from(".") + in_page.config.format.get_extension()).as_str(),
         &img,
         &mut buf,
         &params,
-    ) {
-        if !success {
-            return Err(MkcbzError::ImageCompressionError(in_page.config.format).into());
-        }
-    } else {
+    )?;
+    if !success {
         return Err(MkcbzError::ImageCompressionError(in_page.config.format).into());
     }
 
