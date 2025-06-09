@@ -75,6 +75,7 @@ impl fmt::Display for ImageFormat {
 // mkcbz errors
 #[derive(Debug)]
 enum MkcbzError {
+    CtrlC,
     FileOpenError(PathBuf),
     ImageCompressionError(ImageFormat),
     InvalidOutputPath(PathBuf),
@@ -87,6 +88,7 @@ enum MkcbzError {
 impl fmt::Display for MkcbzError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::CtrlC => write!(f, "Received process interrupt"),
             Self::FileOpenError(path) => write!(f, "Failed to open file (\"{}\")", path.display()),
             Self::ImageCompressionError(img_fmt) => {
                 write!(f, "Failed to compress image format (\"{img_fmt}\")")
@@ -395,6 +397,15 @@ fn run() -> Result<()> {
     let should_continue = Arc::new(AtomicBool::new(true));
     let condvar = Arc::new(Condvar::new());
 
+    // Ctrl+C handler
+    let ctrlc_condvar = Arc::clone(&condvar);
+    let ctrlc_should_continue = Arc::clone(&should_continue);
+    ctrlc::set_handler(move || {
+        ctrlc_should_continue.store(false, Ordering::SeqCst);
+        ctrlc_condvar.notify_one();
+    })
+    .expect("Should be able to set Ctrl+c handler");
+
     // Worker threads
     let mut worker_handles = Vec::new();
     for _ in 0..num_threads {
@@ -448,6 +459,22 @@ fn run() -> Result<()> {
         // Wait for a result
         while pages_lock[next_index].is_none() {
             pages_lock = condvar.wait(pages_lock).unwrap();
+
+            // Did we get a Ctrl+C?
+            if !should_continue.load(Ordering::SeqCst) {
+                // Release lock
+                drop(pages_lock);
+                // Finalize progress so far on ZIP file
+                zip_archive.finish()?;
+                // Wait on workers
+                for handle in worker_handles {
+                    if handle.join().is_err() {
+                        return Err(MkcbzError::ThreadJoinError.into());
+                    }
+                }
+                // Return with Ctrl+C
+                return Err(MkcbzError::CtrlC.into());
+            }
         }
 
         // Insert all available pages that next in line into the ZIP
