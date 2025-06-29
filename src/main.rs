@@ -1,5 +1,5 @@
 //
-// Copyright 2024-2025 Christopher Atherton <the8lack8ox@pm.me>
+// Copyright 2024-2025 Christopher Atherton <cjatherton@proton.me>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the “Software”), to
