@@ -205,7 +205,7 @@ struct Cli {
 
     #[arg(short, long, default_value_t = ImageFormat::Webp, help = "Format for image conversion")]
     format: ImageFormat,
-    #[arg(short, long, default_value_t = 80, value_parser = clap::value_parser!(u32).range(..=100), help = "Quality setting")]
+    #[arg(short, long, default_value_t = 95, value_parser = clap::value_parser!(u32).range(..=100), help = "Quality setting")]
     quality: u32,
     #[arg(
         short,
@@ -308,11 +308,15 @@ fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
             width: 0,
             height: 0,
         };
+        const KERNEL_SIZE: core::Size = core::Size {
+            width: 5,
+            height: 5,
+        };
         let mut tmp = Mat::default();
         imgproc::resize(&img, &mut tmp, ZERO_SIZE, 2.0, 2.0, imgproc::INTER_LINEAR)?;
         imgproc::bilateral_filter_def(&tmp, &mut img, 17, 7.0, 110.0)?;
-        imgproc::resize(&img, &mut tmp, ZERO_SIZE, 0.5, 0.5, imgproc::INTER_AREA)?;
-        img = tmp;
+        imgproc::gaussian_blur_def(&img, &mut tmp, KERNEL_SIZE, 0.3)?;
+        imgproc::pyr_down_def(&tmp, &mut img)?;
     }
 
     // Compress image
@@ -538,8 +542,8 @@ fn run() -> Result<()> {
     // File size difference
     let new_size = get_file_size(&cli.output)?;
     let ratio = (new_size as f32) / (old_size as f32);
-    let old_size_mb = (old_size as f32) / 1000000.0;
-    let new_size_mb = (new_size as f32) / 1000000.0;
+    let old_size_mb = (old_size as f32) / 1_000_000.0;
+    let new_size_mb = (new_size as f32) / 1_000_000.0;
     println!("Size difference: {new_size_mb:.1} MB / {old_size_mb:.1} MB = {ratio:.3}");
 
     // Done
