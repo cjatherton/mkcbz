@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "Pack images into comic book archive (ZIP format)"
-authors = ["Christopher Atherton <cjatherton@proton.me>"]
+authors = ["Christopher Atherton <cjatherton@pm.me>"]
 
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }
