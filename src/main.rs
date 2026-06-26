@@ -1,5 +1,5 @@
 //
-// Copyright 2024-2025 Christopher Atherton <cjatherton@pm.me>
+// Copyright 2024-2026 Christopher Atherton <cjatherton@pm.me>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the “Software”), to
@@ -79,6 +79,7 @@ enum MkcbzError {
     FileOpenError(PathBuf),
     ImageCompressionError(ImageFormat),
     InvalidOutputPath(PathBuf),
+    NoInputs,
     NotAFileOrDirectory(PathBuf),
     NotFound(PathBuf),
     ThreadJoinError,
@@ -96,6 +97,7 @@ impl fmt::Display for MkcbzError {
             Self::InvalidOutputPath(path) => {
                 write!(f, "Not a valid output path (\"{}\")", path.display())
             }
+            Self::NoInputs => write!(f, "No inputs provided"),
             Self::NotAFileOrDirectory(path) => {
                 write!(f, "Not a file or directory (\"{}\")", path.display())
             }
@@ -387,6 +389,11 @@ fn run() -> Result<()> {
             path,
             config: config.clone(),
         });
+    }
+
+    // Check for no images provided
+    if input_pages.is_empty() {
+        return Err(MkcbzError::NoInputs.into());
     }
 
     // Shared data structures
