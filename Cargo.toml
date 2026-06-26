@@ -9,5 +9,5 @@ authors = ["Christopher Atherton <cjatherton@pm.me>"]
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }
 ctrlc = "3.5"
-opencv = "0.98"
+opencv = "0.99"
 zip = { version = "8", default-features = false }
