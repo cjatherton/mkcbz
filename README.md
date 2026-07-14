@@ -8,7 +8,7 @@ mkcbz is a simple tool for creating comic book archives while performing some ad
 ## Building
 
 ### Toolchain
-I'm not sure about the exact toolchain requirements at this time. This project uses Rust 2024 edition.
+This project uses Rust 2024 edition.
 
 ### Dependency: OpenCV
 mkcbz uses [OpenCV](https://opencv.org/) for its image processing, and the [Rust OpenCV bindings](https://crates.io/crates/opencv) are required. Therefore you must have `clang`, `clang-devel`, `opencv` and `opencv-devel` installed to build mkcbz.
