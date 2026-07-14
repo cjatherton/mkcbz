@@ -192,6 +192,7 @@ fn collect_inputs(inputs: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
 struct ImageConfig {
     format: ImageFormat,
     quality: u32,
+    speed: u32,
     color_thr: f64,
     denoise: bool,
 }
@@ -209,6 +210,8 @@ struct Cli {
     format: ImageFormat,
     #[arg(short, long, default_value_t = 90, value_parser = clap::value_parser!(u32).range(..=100), help = "Quality setting")]
     quality: u32,
+    #[arg(short, long, default_value_t = 7, value_parser = clap::value_parser!(u32).range(..=10), help="Speed setting for AVIF compression")]
+    speed: u32,
     #[arg(
         short,
         long,
@@ -327,6 +330,8 @@ fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
         ImageFormat::Avif => {
             params.push(imgcodecs::ImwriteFlags::IMWRITE_AVIF_QUALITY as i32);
             params.push(in_page.config.quality as i32);
+            params.push(imgcodecs::ImwriteFlags::IMWRITE_AVIF_SPEED as i32);
+            params.push(in_page.config.speed as i32);
         }
         ImageFormat::Jpeg => {
             params.push(imgcodecs::ImwriteFlags::IMWRITE_JPEG_QUALITY as i32);
@@ -368,6 +373,7 @@ fn run() -> Result<()> {
     let config = ImageConfig {
         format: cli.format,
         quality: cli.quality,
+        speed: cli.speed,
         color_thr: cli.threshold,
         denoise: !cli.no_denoise,
     };
