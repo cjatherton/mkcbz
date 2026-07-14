@@ -27,8 +27,8 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::LazyLock;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
@@ -317,11 +317,21 @@ fn process_page(in_page: InputPage) -> Result<ProcessedPage> {
             width: 5,
             height: 5,
         };
-        let mut tmp = Mat::default();
-        imgproc::resize(&img, &mut tmp, ZERO_SIZE, 2.0, 2.0, imgproc::INTER_LINEAR)?;
-        imgproc::bilateral_filter_def(&tmp, &mut img, 17, 7.0, 110.0)?;
-        imgproc::gaussian_blur_def(&img, &mut tmp, KERNEL_SIZE, 0.3)?;
-        imgproc::pyr_down_def(&tmp, &mut img)?;
+        const SHARP_STRENGTH: f64 = 2.0;
+        let mut tmp1 = Mat::default();
+        let mut tmp2 = Mat::default();
+        imgproc::resize(&img, &mut tmp1, ZERO_SIZE, 2.0, 2.0, imgproc::INTER_LINEAR)?;
+        imgproc::bilateral_filter_def(&tmp1, &mut img, 15, 7.0, 110.0)?;
+        imgproc::resize(&img, &mut tmp1, ZERO_SIZE, 0.5, 0.5, imgproc::INTER_AREA)?;
+        imgproc::gaussian_blur_def(&tmp1, &mut tmp2, KERNEL_SIZE, 0.3)?;
+        core::add_weighted_def(
+            &tmp1,
+            1.0 + SHARP_STRENGTH,
+            &tmp2,
+            -SHARP_STRENGTH,
+            0.0,
+            &mut img,
+        )?;
     }
 
     // Compress image
